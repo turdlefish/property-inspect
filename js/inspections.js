@@ -49,7 +49,7 @@ export function inspectionSheet(opts, done) {
       <div class="field" id="i-newf"><label for="i-new">New address</label><input class="input" id="i-new" placeholder="e.g. 8 Heron St, Marrickville NSW 2204"><span class="small muted">It’s added to To review.</span></div>`}
       <div class="field"><label for="i-date">Day</label><input class="input" id="i-date" type="date" value="${date}"></div>
       <div class="grid2"><div class="field"><label for="i-start">Starts</label><input class="input" id="i-start" type="time" value="${cur ? cur.start : '10:00'}"></div>
-        <div class="field"><label for="i-end">Ends</label><input class="input" id="i-end" type="time" value="${cur ? cur.end : '10:20'}"></div></div>
+        <div class="field"><label for="i-end">Ends</label><input class="input" id="i-end" type="time" value="${cur ? cur.end : '10:30'}"></div></div>
       <div class="field"><label for="i-note">Note (optional)</label><input class="input" id="i-note" value="${esc(cur?.note || '')}" placeholder="e.g. Private inspection, agent Sam 0400 000 000"></div>
       <p class="err" id="i-err" hidden></p>
       <div class="row-btns"><button class="btn primary">${cur ? 'Save' : 'Add time'}</button><button type="button" class="btn" data-close>Cancel</button>${cur ? '<button type="button" class="btn" data-remove style="margin-left:auto;color:var(--red)">Remove</button>' : ''}</div>
@@ -57,8 +57,8 @@ export function inspectionSheet(opts, done) {
   const sel = s.querySelector('#i-prop');
   const syncNew = () => { if (sel) s.querySelector('#i-newf').hidden = !!sel.value; };
   if (sel) { if (props.length) sel.value = props[0].id; sel.onchange = syncNew; syncNew(); }
-  // keep the end 20 minutes after the start unless you change it
-  s.querySelector('#i-start').onchange = e => { if (!cur) s.querySelector('#i-end').value = addMins(e.target.value, 20); };
+  // keep the end 30 minutes after the start unless you change it
+  s.querySelector('#i-start').onchange = e => { if (!cur) s.querySelector('#i-end').value = addMins(e.target.value, 30); };
   s.onclick = e => {
     if (e.target.closest('[data-close]')) return closeSheet();
     if (e.target.closest('[data-remove]')) { setProp(opts.propId, opts.key, null); closeSheet(); toast('Inspection removed'); done(); }

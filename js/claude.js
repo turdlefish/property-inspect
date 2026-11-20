@@ -104,7 +104,7 @@ const str = v => (v == null || String(v).trim() === '' || String(v).toLowerCase(
 const isDate = v => /^\d{4}-\d{2}-\d{2}$/.test(v || '');
 const isTime = v => /^\d{1,2}:\d{2}$/.test(v || '');
 const pad = t => (t && t.length === 4 ? '0' + t : t);
-const plus20 = t => { const [h, m] = t.split(':').map(Number); const x = h * 60 + m + 20; return `${String(Math.floor(x / 60) % 24).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
+const plus30 = t => { const [h, m] = t.split(':').map(Number); const x = h * 60 + m + 30; return `${String(Math.floor(x / 60) % 24).padStart(2, '0')}:${String(x % 60).padStart(2, '0')}`; };
 
 /** What the answer would change: [{ key, label, value, show, kept }] plus the inspection and sale records. */
 export function plan(id, d) {
@@ -147,7 +147,7 @@ export function plan(id, d) {
   const insps = (Array.isArray(d.inspections) ? d.inspections : [])
     .filter(x => x && isDate(x.date) && isTime(x.start))
     // listed open homes aren't on your schedule until you choose them on the property page
-    .map(x => ({ date: x.date, start: pad(x.start), end: isTime(x.end) ? pad(x.end) : plus20(pad(x.start)), note: 'Open home (from the listing)', planned: false }));
+    .map(x => ({ date: x.date, start: pad(x.start), end: isTime(x.end) ? pad(x.end) : plus30(pad(x.start)), note: 'Open home (from the listing)', planned: false }));
   const newInsps = insps.filter(x => !have.has(x.date + ' ' + x.start));
 
   // Past sales, skipping ones already in the history (same month and price).

@@ -53,14 +53,14 @@ export function quickAddSheet(nav, onSaved = () => {}) {
     const v = priceFrom($('#qa-price').value);
     $('#qa-pnum').textContent = v ? `Budget will use about $${v.toLocaleString('en-AU')}` : '';
   };
-  // End time follows the start (open homes are usually 20 minutes) until you change it.
+  // End time follows the start (inspections default to 30 minutes) until you change it.
   let endTouched = false;
   $('#qa-end').oninput = () => { endTouched = true; };
   $('#qa-start').oninput = () => {
     const v = $('#qa-start').value;
     if (endTouched || !v) return;
     const [h, m] = v.split(':').map(Number);
-    const t = h * 60 + m + 20;
+    const t = h * 60 + m + 30;
     $('#qa-end').value = `${String(Math.floor(t / 60) % 24).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`;
   };
 
