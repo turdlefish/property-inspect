@@ -129,6 +129,11 @@ export function plan(id, d) {
   add('priceNum', 'Expected price', num(d.priceNum), num(d.priceNum) ? money(num(d.priceNum)) : '');
   add('listedDate', 'First listed', isDate(d.listedDate) ? d.listedDate : null);
   add('agent', 'Agent', str(d.agent));
+  // The auction goes in its own field; a result one of you has already added is never replaced.
+  if (d.auction && isDate(d.auction.date) && !(p.auction && p.auction.outcome) && p.auction?.date !== d.auction.date) {
+    const time = isTime(d.auction.time) ? pad(d.auction.time) : '';
+    add('auction', 'Auction', { date: d.auction.date, time, outcome: '', outDate: '', note: '' }, d.auction.date + (time ? ' ' + time : ''));
+  }
   add('description', 'Description', str(d.description));
   const feats = Array.isArray(d.features) ? d.features.map(str).filter(Boolean).slice(0, 15) : [];
   if (feats.length) add('features', 'Features', feats, feats.join(' · '));
@@ -143,7 +148,6 @@ export function plan(id, d) {
     .filter(x => x && isDate(x.date) && isTime(x.start))
     // listed open homes aren't on your schedule until you choose them on the property page
     .map(x => ({ date: x.date, start: pad(x.start), end: isTime(x.end) ? pad(x.end) : plus20(pad(x.start)), note: 'Open home (from the listing)', planned: false }));
-  if (d.auction && isDate(d.auction.date)) insps.push({ date: d.auction.date, start: isTime(d.auction.time) ? pad(d.auction.time) : '10:00', end: isTime(d.auction.time) ? plus20(pad(d.auction.time)) : '10:30', note: 'Auction', planned: false });
   const newInsps = insps.filter(x => !have.has(x.date + ' ' + x.start));
 
   // Past sales, skipping ones already in the history (same month and price).

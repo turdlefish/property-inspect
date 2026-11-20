@@ -760,3 +760,56 @@ body{font-size:15px}
 .fb-meta{display:block;margin-top:3px;font-size:11.5px;font-weight:700;color:var(--muted)}
 .fb-done summary{cursor:pointer;color:var(--muted);font-weight:700}
 .fb-done .fb-list{margin-top:8px}
+
+/* Auction (Nov 2026) */
+.auc-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:12px;background:var(--blue-soft)}
+.auc-row .eyebrow{color:var(--blue)}
+.auc-row .pill{margin-top:3px}
+.pill-btn{border:0;background:none;padding:0;cursor:pointer;display:inline-flex}
+
+/* Google Maps route card on the Inspections tab */
+.rstops{display:flex;flex-direction:column}
+.rstop{display:flex;align-items:center;gap:10px;padding:8px 2px;border-top:1px solid var(--line);cursor:pointer}
+.rstop:first-child{border-top:0}
+.rstop input{width:20px;height:20px;accent-color:var(--accent);flex:none;margin:0}
+.rnum{font-size:12.5px;color:var(--muted);flex:none;min-width:58px}
+.raddr{flex:1;min-width:0;font-weight:600}
+.route-opts{display:flex;flex-direction:column;gap:8px}
+.route .btn.primary{width:100%}
+
+/* Property page halves: one column on a phone, side by side on a computer */
+.pside,.pmain{display:flex;flex-direction:column;gap:14px;min-width:0}
+.pside > *,.pmain > *{flex-shrink:0}
+
+/* Wide screens (the website on a computer, Nov 2026): the tabs move down the left,
+   property cards sit in columns, and the property page puts its photos and summary
+   beside the sections instead of one long phone-width strip. */
+@media (min-width:1000px){
+  .shell{max-width:none;display:grid;grid-template-columns:230px minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);border:0}
+  .topbar{grid-column:2;grid-row:1;padding:14px 32px}
+  main{grid-column:2;grid-row:2;padding:24px 32px 48px;gap:16px}
+  .tabs{grid-column:1;grid-row:1 / 3;display:flex;flex-direction:column;justify-content:flex-start;gap:4px;padding:20px 12px;border-top:0;border-right:1px solid var(--line)}
+  .tabs::before{content:"Property Inspect";font-family:var(--f-display);font-weight:600;font-size:19px;color:var(--ink);padding:2px 14px 16px}
+  .tabs button{flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;font-size:14.5px}
+  .tabs button .tbadge{position:static;margin-left:auto;transform:none}
+  .toast{bottom:28px}
+
+  main[data-route="lists"]{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));align-content:start;align-items:start}
+  main[data-route="lists"] > :not(.pcard){grid-column:1 / -1}
+  main[data-route="lists"] #addBtn{width:auto!important;justify-self:start;padding:10px 22px}
+  main[data-route="lists"] .lists-seg{max-width:640px}
+  .pcard{grid-template-columns:120px minmax(0,1fr);height:100%}
+
+  main[data-route="prop"]{display:grid;grid-template-columns:minmax(360px,440px) minmax(0,1fr);align-items:start;column-gap:28px}
+  main[data-route="prop"] .totop{grid-column:2;justify-self:end}
+  .pside .ph-tile{width:90%}
+  .pside .hero{height:220px}
+
+  main:is([data-route="inspections"],[data-route="money"],[data-route="us"]) > *{width:100%;max-width:860px;margin-inline:auto}
+}
+@media (min-width:1500px){
+  main[data-route="prop"]{grid-template-columns:460px minmax(0,1fr)}
+  main[data-route="prop"] .pmain{display:block;columns:2;column-gap:16px}
+  main[data-route="prop"] .pmain > *{break-inside:avoid;margin-bottom:16px}
+  main[data-route="prop"] .pmain > .pgroup{column-span:none}
+}

@@ -6,7 +6,7 @@ import { addProperty, setProps } from './props.js';
 import { openSheet, closeSheet, toast } from './ui.js';
 
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const TYPES = ['House', 'Townhouse', 'Apartment', 'Land'];
+const TYPES = ['House', 'Townhouse', 'Villa', 'Apartment', 'Land'];
 
 /** "$780k – $830k", "Guide 1.05m-1.12m", "$795,000" → one number (the middle of a range), or null. */
 export function priceFrom(text) {
@@ -38,6 +38,9 @@ export function quickAddSheet(nav, onSaved = () => {}) {
       <div class="field"><label for="qa-link">Listing link <span class="muted">(optional)</span></label><input class="input" id="qa-link" inputmode="url" autocapitalize="off" placeholder="https://…" autocomplete="off"></div>
       <div class="field"><label>Open home <span class="muted">(optional)</span></label><div style="display:flex;gap:8px;flex-wrap:wrap">
         <input class="input" id="qa-date" type="date" style="flex:1 1 140px"><input class="input" id="qa-start" type="time" style="flex:0 1 110px" aria-label="Starts"><input class="input" id="qa-end" type="time" style="flex:0 1 110px" aria-label="Ends"></div></div>
+      <div class="field"><label>Auction <span class="muted">(optional)</span></label><div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input class="input" id="qa-adate" type="date" style="flex:1 1 140px" aria-label="Auction day"><input class="input" id="qa-atime" type="time" style="flex:0 1 110px" aria-label="Auction time"></div>
+        <span class="small muted">You can add whether it sold, passed in or was withdrawn later, on the property.</span></div>
       <div class="field"><label for="qa-note">Notes <span class="muted">(optional)</span></label><textarea class="input" id="qa-note" rows="2" placeholder="First thoughts, agent's name, anything"></textarea></div>
       <p class="err" id="qa-err" hidden></p>
       <div class="row-btns"><button class="btn primary">Save</button><button type="button" class="btn" data-close>Cancel</button></div>
@@ -90,6 +93,8 @@ export function quickAddSheet(nav, onSaved = () => {}) {
     if (type) extra.type = type;
     if (price) { extra.price = price; const pn = priceFrom(price); if (pn) extra.priceNum = pn; }
     const link = $('#qa-link').value.trim();
+    const adate = $('#qa-adate').value;
+    if (adate) extra.auction = { date: adate, time: $('#qa-atime').value || '', outcome: '', outDate: '', note: '' };
     if (link) extra.src_facts = /^https?:\/\//i.test(link) ? link : 'https://' + link;
     const id = addProperty(addr, extra);
 

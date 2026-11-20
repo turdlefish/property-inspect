@@ -43,6 +43,7 @@ const nav = {
 function render(keepScroll) {
   const st = view.scrollTop;
   const tab = route.startsWith('prop-') ? 'lists' : route;
+  view.dataset.route = route.startsWith('prop-') ? 'prop' : route;   // for the wide-screen layout
   document.querySelectorAll('#tabs button').forEach(b => b.setAttribute('aria-current', String(b.dataset.go === tab)));
   view.onclick = view.onkeydown = view.onsubmit = view.oninput = view.onchange = view.onscroll = null;
   if (route === 'lists') renderLists(view, topbar, nav);

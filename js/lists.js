@@ -10,6 +10,7 @@ import { nextInspection, inspText } from './inspections.js';
 import { photosOf, thumbUrl, storageBanner, storageUse, deleteAllPhotos, mb } from './photos.js';
 import { limitsBanner } from './limits.js';
 import { quickAddSheet } from './quickadd.js';
+import { auctionPill } from './auction.js';
 
 export const listState = { tab: 'short' };
 
@@ -56,7 +57,7 @@ function card(p) {
       ${facts ? `<div class="facts">${facts}</div>` : ''}
       ${accessText(p) ? `<div class="sub">${esc(accessText(p))}</div>` : ''}
       ${soldLine(p)}
-      <div class="meta">${(() => { const c = flagCounts(p); return (c.red ? `<span class="pill red">${c.red} concern${c.red === 1 ? "" : "s"}</span>` : '') + (c.amber ? `<span class="pill amber">${c.amber} to check</span>` : '') + (c.green ? `<span class="pill green">${c.green} good</span>` : ''); })()}${nextInspection(p) ? `<span class="pill accent">${esc(inspText(nextInspection(p)))}</span>` : ''}${p.viewed ? '<span class="pill green">✓ Viewed</span>' : ''}</div>
+      <div class="meta">${(() => { const c = flagCounts(p); return (c.red ? `<span class="pill red">${c.red} concern${c.red === 1 ? "" : "s"}</span>` : '') + (c.amber ? `<span class="pill amber">${c.amber} to check</span>` : '') + (c.green ? `<span class="pill green">${c.green} good</span>` : ''); })()}${nextInspection(p) ? `<span class="pill accent">${esc(inspText(nextInspection(p)))}</span>` : ''}${auctionPill(p)}${p.viewed ? '<span class="pill green">✓ Viewed</span>' : ''}</div>
       ${voteBlock(p, true)}
     </div></div>`;
 }

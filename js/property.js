@@ -16,6 +16,10 @@ import { claudeSheet } from './claude.js';
 import { strataSheet } from './strata.js';
 import { usageLine } from './limits.js';
 import { inspectionsOf, nextInspection, inspText, inspectionSheet, dayLabel, time12, iso, onSchedule, toggleSchedule } from './inspections.js';
+import { auctionOf, auctionText, auctionPill, auctionSheet, OUTCOMES } from './auction.js';
+
+// Types where the land size matters (so the Land row shows even before it's filled in).
+const LAND_TYPES = new Set(['House', 'Villa', 'Duplex', 'Terrace', 'Land']);
 
 const KIND = { listing: 'Listing photo', ours: 'Our photo', floorplan: 'Floorplan' };
 
@@ -128,6 +132,7 @@ export function renderProperty(view, topbar, nav, id) {
   const range = a => { const x = (a || []).filter(n => n > 0); return x.length ? (Math.min(...x) === Math.max(...x) ? `${x[0]}` : `${Math.min(...x)}–${Math.max(...x)}`) : ''; };
   const quarter = (p.councilQ || 0) + (p.waterQ || 0) + (p.levyQ || 0) + (p.specialQ || 0);
   const sevWord = k => (p[k] ? SEV[p[k].sev]?.[0] : 'not checked');
+  const auc = auctionOf(p);
   const nextI = nextInspection(p), openHomes = inspectionsOf(p).filter(x => !onSchedule(x) && x.date >= iso(new Date())).length;
   // Sections with nothing in them yet are tucked into one "Add more" card (Nov 2026: the
   // page had 12 cards and things were hard to find). Tapping one there brings it back.
@@ -158,6 +163,7 @@ export function renderProperty(view, topbar, nav, id) {
   const glance = [
     p.priceNum && ['Expected price', money(p.priceNum), 's-details'],
     nextI && ['Next inspection', inspText(nextI), 's-insp'],
+    auc && ['Auction', auctionText(auc) + (auc.note ? ' · ' + auc.note : ''), 's-insp'],
     (counts.green || counts.red || counts.amber || notes.length) && ['Our visit', [counts.green && `${counts.green} good`, counts.red && `${counts.red} concern${counts.red === 1 ? '' : 's'}`, counts.amber && `${counts.amber} to check`, notes.length && `${notes.length} note${notes.length === 1 ? '' : 's'}`].filter(Boolean).join(' · '), 's-visit'],
     p[`cmr:${me}:to`]?.legs?.length ? ['To work, public transport', `${tripTotal(p[`cmr:${me}:to`])} min · ${tripSummary(p[`cmr:${me}:to`]).split(' · ')[0]}`, 's-commute']
       : cm && range(cm.pt) && ['To work, train/bus', `${range(cm.pt)} min`, 's-commute'],
@@ -165,14 +171,14 @@ export function renderProperty(view, topbar, nav, id) {
     hz.length && ['Watch out', hz.join(' · '), 's-hazards'],
   ].filter(Boolean);
   const glanceBox = glance.length ? `<div class="glance"><span class="eyebrow">At a glance</span>${glance.map(([k, v, s]) => `<button class="grow" data-jump="${s}"><span class="gk">${k}</span><span class="gv">${esc(v)}</span><span class="chev" aria-hidden="true">›</span></button>`).join('')}</div>` : '';
-  const sections = [['s-details', 'Details'], ['s-facing', 'Floorplan & facing'], ['s-building', 'Access & amenities'], ['s-commute', 'Commute'], ['s-nearby', 'Nearby'], ['s-insp', 'Inspection times'], ['s-visit', 'Our visit'], ['s-value', 'Value & history'], ['s-hazards', 'Flood, bushfire & heritage'], ['s-strata', 'Strata & builder'], ['s-rates', 'Rates'], ['s-sources', 'Sources']];
+  const sections = [['s-details', 'Details'], ['s-facing', 'Floorplan & facing'], ['s-building', 'Access & amenities'], ['s-commute', 'Commute'], ['s-nearby', 'Nearby'], ['s-insp', 'Inspections & auction'], ['s-visit', 'Our visit'], ['s-value', 'Value & history'], ['s-hazards', 'Flood, bushfire & heritage'], ['s-strata', 'Strata & builder'], ['s-rates', 'Rates'], ['s-sources', 'Sources']];
 
-  view.innerHTML = `
+  view.innerHTML = `<div class="pside">
   ${gallery.length
     ? `<div class="gallery">${gallery.map(tile).join('')}<button class="ph-tile ph-add" data-addphoto="listing">＋ Add photos</button></div>`
     : `<div class="thumb hero" style="--h:${hueOf(p.id)}">${HOUSE}<button class="btn sm hero-add" data-addphoto="listing">＋ Add photos</button></div>`}
   <div class="ptitle" id="top">
-    <div class="line"><button class="pill ${l.tone}" data-menu="${p.id}" style="cursor:pointer">${l.label} ▾</button>${nextI ? `<button class="pill accent" data-jump="s-insp" style="cursor:pointer">Inspect ${esc(inspText(nextI))}</button>` : ''}${p.viewed ? '<span class="pill green">✓ Viewed</span>' : ''}${counts.green ? `<button class="pill green" data-jump="s-visit">${counts.green} good</button>` : ''}${counts.red ? `<button class="pill red" data-jump="s-visit">${counts.red} concern${counts.red === 1 ? '' : 's'}</button>` : ''}</div>
+    <div class="line"><button class="pill ${l.tone}" data-menu="${p.id}" style="cursor:pointer">${l.label} ▾</button>${nextI ? `<button class="pill accent" data-jump="s-insp" style="cursor:pointer">Inspect ${esc(inspText(nextI))}</button>` : ''}${auc ? `<button class="pill-btn" data-jump="s-insp">${auctionPill(p)}</button>` : ''}${p.viewed ? '<span class="pill green">✓ Viewed</span>' : ''}${counts.green ? `<button class="pill green" data-jump="s-visit">${counts.green} good</button>` : ''}${counts.red ? `<button class="pill red" data-jump="s-visit">${counts.red} concern${counts.red === 1 ? '' : 's'}</button>` : ''}</div>
     <h1>${esc(p.address)} <button class="edit" data-edit="address" aria-label="Edit address">✎</button></h1>
     <div class="muted">${esc([p.suburb, p.type].filter(Boolean).join(' · '))}</div>
     ${p.price ? `<div class="price-line">${esc(p.price)}</div>` : ''}
@@ -184,18 +190,20 @@ export function renderProperty(view, topbar, nav, id) {
     ${usageLine()}
     ${lookupNote(p)}
   </div>
+  </div><div class="pmain">
 
   ${group('At the inspection', ['s-details', 's-insp', 's-visit', 's-facing'])}
   ${show('s-details', () => card('s-details', '🏠', 'Details', [p.beds != null && `${p.beds} bed`, p.baths != null && `${p.baths} bath`, p.size && String(p.size).split('·')[0].trim(), p.priceNum && `expect ${money(p.priceNum)}`].filter(Boolean).join(' · '), () => `
-    ${list(['price', 'priceNum', 'type', 'beds', 'baths', 'cars', 'size', ...(p.land || p.type === 'House' ? ['land'] : []), 'garage', 'nbn', 'listedDate', 'agent'])}
+    ${list(['price', 'priceNum', 'type', 'beds', 'baths', 'cars', 'size', ...(p.land || LAND_TYPES.has(p.type) ? ['land'] : []), 'garage', 'nbn', 'listedDate', 'agent'])}
     ${Array.isArray(p.features) && p.features.length ? `<div class="tags">${p.features.map(f => `<span class="tag">${esc(f)}</span>`).join('')}<button class="edit" data-edit="features" aria-label="Edit features">✎</button></div>` : ''}
     ${p.description ? `<details class="desc"><summary class="small">Description</summary><p class="small">${esc(p.description)}</p><button class="edit small" data-edit="description">✎ Change</button></details>` : ''}
     ${provenance(p, ['price', 'priceNum', 'type', 'beds', 'baths', 'cars', 'size', 'land', 'garage', 'nbn', 'listedDate', 'agent', 'features', 'description'])}
     <div class="row-btns"><button class="btn sm" data-money>${p.priceNum ? 'Run the numbers' : 'Run the numbers (add the expected price)'}</button>${p.src_facts ? `<a class="btn sm" href="${esc(p.src_facts)}" target="_blank" rel="noopener">Listing ↗</a>` : ''}</div>`, { open: true }))}
 
-  ${show('s-insp', () => card('s-insp', '📅', 'Inspection times', nextI ? `next: ${inspText(nextI)}` : openHomes ? `${openHomes} open home${openHomes === 1 ? '' : 's'} to choose from` : 'none yet', () => `
+  ${show('s-insp', () => card('s-insp', '📅', 'Inspections & auction', [nextI ? `next: ${inspText(nextI)}` : openHomes ? `${openHomes} open home${openHomes === 1 ? '' : 's'} to choose from` : 'no times yet', auc && `auction ${auctionText(auc)}`].filter(Boolean).join(' · '), () => `
+    ${aucRow(auc)}
     ${inspectionsOf(p).map(x => { const on = onSchedule(x); return `<div class="insp-row ${x.date < iso(new Date()) ? 'past' : ''}"><span class="num" style="flex:1">${esc(dayLabel(x.date))} · ${time12(x.start)}${x.end ? '–' + time12(x.end) : ''}${x.note ? `<br><span class="small muted" style="font-family:var(--f-body)">${esc(x.note)}</span>` : ''}</span><button class="btn sm ${on ? 'on-green' : ''}" data-sched="${x.key}" aria-pressed="${on}">${on ? '✓ On our schedule' : '＋ Add to schedule'}</button><button class="edit" data-editinsp="${x.key}" aria-label="Change time">✎</button></div>`; }).join('') || '<p class="small muted" style="margin:0">No times yet. Fill in with Claude brings in the open homes from the listing, or add one yourself.</p>'}
-    ${inspectionsOf(p).some(x => !onSchedule(x)) ? '<p class="small muted" style="margin:0">Open homes from the listing only go on your Inspections tab once you add them.</p>' : ''}`, { action: '<button class="btn sm" data-addinsp>＋ Add a time</button>' }))}
+    ${inspectionsOf(p).some(x => !onSchedule(x)) ? '<p class="small muted" style="margin:0">Open homes from the listing only go on your Inspections tab once you add them.</p>' : ''}`, { action: `<button class="btn sm" data-addinsp>＋ Add a time</button>${auc ? '' : '<button class="btn sm" data-auction>＋ Auction</button>'}` }))}
 
   ${show('s-visit', () => card('s-visit', '🔑', 'Our visit', [p.viewed ? 'viewed' : 'not viewed yet', counts.green ? `${counts.green} good` : '', counts.red ? `${counts.red} concern${counts.red === 1 ? '' : 's'}` : '', notes.length ? `${notes.length} note${notes.length === 1 ? '' : 's'}` : ''].filter(Boolean).join(' · '), () => `
     <div class="qb"><button class="viewed" data-viewed aria-pressed="${!!p.viewed}"><span class="box">${p.viewed ? '✓' : ''}</span>${p.viewed ? `We’ve been to see it${p.rec.viewed ? ` · ${when(p.rec.viewed.t)}` : ''}` : 'We’ve been to see it'}</button></div>
@@ -281,6 +289,7 @@ export function renderProperty(view, topbar, nav, id) {
   ${moreCard()}
 
   <div class="row-btns"><button class="btn sm" data-menu="${p.id}">Move, mark sold or delete</button></div>
+  </div>
   <button class="totop" data-jump="top" aria-label="Back to the top">↑ Top</button>`;
 
   const rerender = () => nav.render(true);
@@ -313,6 +322,7 @@ export function renderProperty(view, topbar, nav, id) {
     if (sc) { const on = toggleSchedule(id, sc.dataset.sched); toast(on ? 'Added to your Inspections tab' : 'Taken off your schedule'); return nav.render(true); }
     const lk = e.target.closest('[data-lookup]');
     if (lk) return startLookup(id, lk.dataset.lookup, nav);
+    if (e.target.closest('[data-auction]')) return auctionSheet(id, () => nav.render(true));
     const t = e.target.closest('[data-money],[data-addinsp],[data-editinsp],[data-addphoto],[data-photo],[data-edit],[data-hazard],[data-menu],[data-jump],[data-addflag],[data-delflag],[data-addsale],[data-delsale],[data-access],[data-bstep],[data-amen],[data-editamen],[data-cdir],[data-work],[data-cedit],[data-trip],[data-compass],[data-viewed],[data-tag],[data-edittags],[data-delnote]');
     if (!t) return;
     const d = t.dataset;
@@ -376,6 +386,15 @@ export function renderProperty(view, topbar, nav, id) {
     if (e.target.id === 'jumpto' && e.target.value) jumpTo(e.target.value);
   };
   return true;
+}
+
+// The auction line at the top of the Inspections & auction card.
+function aucRow(a) {
+  if (!a) return '';
+  const [label, tone] = OUTCOMES[a.outcome || ''];
+  return `<div class="auc-row"><span class="eyebrow">Auction</span><span style="flex:1"><b class="num">${esc(dayLabel(a.date))}${a.time ? ' · ' + time12(a.time) : ''}</b>
+    <br><span class="pill ${tone}">${esc(label)}${a.outcome && a.outDate ? ' · ' + esc(dayLabel(a.outDate)) : ''}</span>${a.note ? ` <span class="small muted">${esc(a.note)}</span>` : ''}</span>
+    <button class="btn sm" data-auction>${a.outcome ? '✎ Change' : a.date < iso(new Date()) ? 'Add the result' : '✎ Change'}</button></div>`;
 }
 
 const host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; } };

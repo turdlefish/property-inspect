@@ -5,6 +5,7 @@
 import { allProperties, getProperty, setProp, addProperty, LISTS } from './props.js';
 import { flagCounts } from './property.js';
 import { esc, openSheet, closeSheet, toast } from './ui.js';
+import { auctionOf, auctionSheet } from './auction.js';
 
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const pad = n => String(n).padStart(2, '0');
@@ -83,11 +84,17 @@ export function inspectionSheet(opts, done) {
 }
 
 // ── The Inspections tab ──────────────────────────────────────────────────
-const state = { day: null };
+// skip: stops unticked for the Google Maps route ("<property id>|<key>"); from: 'here' or 'first'; mode: driving or walking
+const state = { day: null, skip: new Set(), from: 'here', mode: 'driving' };
 
 function everything() {
   const out = [];
-  for (const p of allProperties()) for (const x of inspectionsOf(p)) if (onSchedule(x)) out.push({ ...x, p });
+  for (const p of allProperties()) {
+    for (const x of inspectionsOf(p)) if (onSchedule(x)) out.push({ ...x, p });
+    // auctions not yet held show on their day too
+    const a = auctionOf(p);
+    if (a && !a.outcome && p.list !== 'sold') { const start = a.time || '10:00'; out.push({ key: 'auction', date: a.date, start, end: addMins(start, 30), note: a.note || '', auction: true, p }); }
+  }
   return out.sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
 }
 
@@ -114,18 +121,22 @@ export function renderInspections(view, topbar, nav) {
       ? `<div class="leg warn">⚠ Clash: starts ${-gap} min before ${esc(prev.p.address)} ends</div>`
       : `<div class="leg ${gap < 10 ? 'warn' : ''}">${gap < 10 ? '⚠ Only ' : ''}${gap} min to get there · <a href="${dir}" target="_blank" rel="noopener">drive time ↗</a></div>`;
   }
-  const route = list.length > 1 ? 'https://www.google.com/maps/dir/' + list.map(x => encodeURIComponent(addr(x.p))).join('/') : '';
+  const routeBox = list.length ? routeCard(list) : '';
 
   view.innerHTML = `
     <div class="sec-head"><button class="iconbtn" data-wk="-7" aria-label="Previous week">‹</button><b style="flex:1;text-align:center">${fromIso(week[0]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })} – ${fromIso(week[6]).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })}</b><button class="iconbtn" data-wk="7" aria-label="Next week">›</button></div>
     <div class="week">${week.map(d => { const x = fromIso(d); return `<button data-day="${d}" aria-pressed="${state.day === d}" class="${has.has(d) ? 'has' : ''} ${d === today() ? 'today' : ''}">${x.toLocaleDateString('en-AU', { weekday: 'short' })}<b>${x.getDate()}</b></button>`; }).join('')}</div>
     <div class="sec-head"><h3 style="font-size:18px">${fromIso(state.day).toLocaleDateString('en-AU', { weekday: 'long', day: 'numeric', month: 'long' })}</h3><span class="muted small">${list.length} booked</span></div>
     ${list.length ? list.map((x, i) => (legs[i] || '') + slot(x)).join('') : '<div class="empty">No inspections this day.<br>Tap ＋ Add to book one.</div>'}
-    ${route ? `<a class="btn" href="${route}" target="_blank" rel="noopener">Open the whole run in Google Maps ↗</a>` : ''}
+    ${routeBox}
     <button class="btn primary" data-addinsp>＋ Add an inspection time</button>
     ${upcoming.length ? `<div class="card"><h3>Coming up</h3>${groupByDay(upcoming).map(([d, xs]) => `<button class="opt" data-day="${d}"><span style="flex:1">${dayLabel(d)}</span><span class="pill accent">${xs.length}</span></button>`).join('')}</div>` : ''}`;
 
   view.onclick = e => {
+    const r = e.target.closest('[data-rfrom],[data-rmode]');
+    if (r) { if (r.dataset.rfrom) state.from = r.dataset.rfrom; if (r.dataset.rmode) state.mode = r.dataset.rmode; return nav.render(true); }
+    const au = e.target.closest('[data-auction]');
+    if (au) return auctionSheet(au.dataset.auction, () => nav.render(true));
     const t = e.target.closest('[data-day],[data-wk],[data-addinsp],[data-open],[data-editinsp],[data-viewed]');
     if (!t) return;
     const d = t.dataset;
@@ -137,9 +148,43 @@ export function renderInspections(view, topbar, nav) {
     if (d.editinsp) return inspectionSheet({ propId: d.pid, key: d.editinsp }, pick);
     if (d.viewed) { const p = getProperty(d.viewed); setProp(p.id, 'viewed', !p.viewed); toast(p.viewed ? 'Marked as not viewed' : 'Marked as viewed'); return nav.render(true); }
   };
+  view.onchange = e => {
+    const c = e.target.closest('[data-rstop]');
+    if (!c) return;
+    if (c.checked) state.skip.delete(c.dataset.rstop); else state.skip.add(c.dataset.rstop);
+    nav.render(true);
+  };
 }
 
 const addr = p => [p.address, p.suburb].filter(Boolean).join(', ');
+const stopId = x => x.p.id + '|' + x.key;
+
+/** Google Maps directions through the ticked stops, in time order.
+ *  Starting "where I am" leaves the origin out, so Google Maps uses the phone's location. */
+export function routeUrl(stops, from = 'here', mode = 'driving') {
+  const a = stops.map(x => addr(x.p));
+  if (!a.length) return '';
+  const origin = from === 'first' && a.length > 1 ? a.shift() : null;
+  const dest = a.pop();
+  const q = new URLSearchParams({ api: '1', destination: dest, travelmode: mode });
+  if (origin) q.set('origin', origin);
+  if (a.length) q.set('waypoints', a.join('|'));
+  return 'https://www.google.com/maps/dir/?' + q.toString();
+}
+
+function routeCard(list) {
+  const picked = list.filter(x => !state.skip.has(stopId(x)));
+  const from = picked.length > 1 ? state.from : 'here';
+  const url = routeUrl(picked, from, state.mode);
+  const tooMany = picked.length > 10;
+  return `<section class="card route"><div class="sec-head"><h3>🗺️ Google Maps route</h3><span class="small muted">${picked.length} of ${list.length} stop${list.length === 1 ? '' : 's'}</span></div>
+    <p class="small muted" style="margin:0">Tick the ones to visit. The route goes in time order.</p>
+    <div class="rstops">${list.map((x, i) => `<label class="rstop"><input type="checkbox" data-rstop="${esc(stopId(x))}" ${state.skip.has(stopId(x)) ? '' : 'checked'}><span class="num rnum">${time12(x.start)}</span><span class="raddr">${esc(x.p.address)}${x.auction ? ' <span class="pill blue">Auction</span>' : ''}</span></label>`).join('')}</div>
+    <div class="route-opts"><div class="seg" role="group" aria-label="Start from">${[['here', 'Start where I am'], ['first', 'Start at the first one']].map(([k, t]) => `<button type="button" data-rfrom="${k}" aria-pressed="${from === k}" ${k === 'first' && picked.length < 2 ? 'disabled' : ''}>${t}</button>`).join('')}</div>
+      <div class="seg" role="group" aria-label="Travel by">${[['driving', 'Drive'], ['walking', 'Walk']].map(([k, t]) => `<button type="button" data-rmode="${k}" aria-pressed="${state.mode === k}">${t}</button>`).join('')}</div></div>
+    ${tooMany ? '<p class="small" style="margin:0;color:var(--amber)">Google Maps takes up to 10 stops, so untick a few.</p>' : ''}
+    ${url && !tooMany ? `<a class="btn primary" href="${esc(url)}" target="_blank" rel="noopener">Open the route in Google Maps ↗</a>` : !picked.length ? '<p class="small muted" style="margin:0">Tick at least one to make a route.</p>' : ''}</section>`;
+}
 function groupByDay(xs) {
   const m = new Map();
   xs.forEach(x => m.set(x.date, [...(m.get(x.date) || []), x]));
@@ -150,7 +195,7 @@ function slot(x) {
   const p = x.p, l = LISTS[p.list] || LISTS.review, c = flagCounts(p);
   const past = x.date < today();
   return `<div class="slot ${past ? 'past' : ''}"><div class="time">${time12(x.start)}<small>${x.end ? time12(x.end) : ''}</small></div><div class="card">
-    <div class="sec-head"><b style="flex:1">${esc(p.address)}</b><span class="pill ${l.tone}">${l.label}</span></div>
+    <div class="sec-head"><b style="flex:1">${esc(p.address)}</b>${x.auction ? '<span class="pill blue">Auction</span>' : ''}<span class="pill ${l.tone}">${l.label}</span></div>
     <div class="muted small">${esc([p.suburb, p.beds != null && p.beds + ' bed', p.cars != null && p.cars + ' car'].filter(Boolean).join(' · '))}</div>
     ${p.price ? `<div class="num" style="font-weight:600">${esc(p.price)}</div>` : ''}
     ${x.note ? `<div class="small">${esc(x.note)}</div>` : ''}
@@ -158,5 +203,5 @@ function slot(x) {
     <div class="row-btns"><button class="btn sm primary" data-open="${p.id}">Open property</button>
       <a class="btn sm" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr(p))}" target="_blank" rel="noopener">Directions ↗</a>
       <button class="btn sm ${p.viewed ? 'on-green' : ''}" data-viewed="${p.id}" aria-pressed="${!!p.viewed}">${p.viewed ? '✓ Viewed' : 'Mark viewed'}</button>
-      <button class="edit" data-editinsp="${x.key}" data-pid="${p.id}" aria-label="Change time">✎</button></div></div></div>`;
+      ${x.auction ? `<button class="edit" data-auction="${p.id}" aria-label="Change the auction">✎</button>` : `<button class="edit" data-editinsp="${x.key}" data-pid="${p.id}" aria-label="Change time">✎</button>`}</div></div></div>`;
 }
