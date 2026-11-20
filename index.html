@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta name="robots" content="noindex, nofollow">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Property Inspect</title>
+  <meta name="description" content="Sift through properties to buy, together: lists, inspections, flags and the money.">
+  <meta name="theme-color" content="#FFF7D6" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#04255A" media="(prefers-color-scheme: dark)">
+  <script>
+    // Light (jellyfish) / Dark (starfish) / Auto (follow the device), chosen per phone in Us.
+    // Set before the page draws, so it never flashes the wrong look.
+    try { var t = localStorage.getItem('prop:theme'); if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t; } catch (e) {}
+    // html.is-light marks the light look actually showing (a chosen Light, or Auto on a light device),
+    // for the few styles that only belong by day.
+    (function () {
+      var mq = window.matchMedia('(prefers-color-scheme: dark)');
+      window.propApplyLook = function () {
+        var d = document.documentElement, t = d.dataset.theme;
+        var light = t === 'light' || (t !== 'dark' && !mq.matches);
+        d.classList.toggle('is-light', light);
+        // In the Android app: colour the phone's status and navigation bars to match.
+        try { if (window.PropNative) window.PropNative.setDark(!light); } catch (e) {}
+      };
+      window.propApplyLook();
+      if (mq.addEventListener) mq.addEventListener('change', window.propApplyLook);
+    })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+  <div id="ob" class="ob" hidden></div>
+  <div id="app" class="shell" hidden>
+    <header class="topbar" id="topbar"></header>
+    <main id="view"></main>
+    <nav class="tabs" id="tabs" aria-label="Main">
+      <button data-go="lists"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11.5 12 5l8 6.5V20H4z"/><path d="M9.5 20v-5h5v5"/></svg>Properties<span class="tbadge" id="b-lists" hidden></span></button>
+      <button data-go="inspections"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="5.5" width="16" height="14.5" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>Inspections<span class="tbadge" id="b-insp" hidden></span></button>
+      <button data-go="money"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="6" width="17" height="12" rx="2"/><circle cx="12" cy="12" r="2.6"/><path d="M7 9.5v5M17 9.5v5"/></svg>Budget</button>
+      <button data-go="us"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3.5 19.5c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M14.8 14.6c.5-.2 1.1-.3 1.7-.3 2.3 0 3.9 1.5 4.3 4.2"/></svg>Us</button>
+    </nav>
+  </div>
+  <div id="sheet" class="sheet-wrap" hidden></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
