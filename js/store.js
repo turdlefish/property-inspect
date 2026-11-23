@@ -17,6 +17,8 @@
 import { CONFIG, apiBase } from './config.js';
 import { makeLongCode } from './spacemove.js';
 
+// Slot "m" is the person who makes the app: their feedback inbox ticks notes
+// off in <ns>:<space>:p:m:feedback (see feedback.js). Read only, never written here.
 const NS = 'prop';
 const HB_NS = 'tend';   // Human Being: only its profiles are read, for pairing
 const SESSION_KEY = 'prop:session';
@@ -206,7 +208,7 @@ function fetchStamps(all) {
   if (all) return api('?select=key,updated_at&key=' + encodeURIComponent(`like.${NS}:${space}:*`));
   const like = s => `key.like.${quote(`${NS}:${space}:p:${s}:*`)}`;
   const part = s => (cursor[s] ? `and(${like(s)},updated_at.gt.${quote(cursor[s])})` : like(s));
-  return api('?select=key,updated_at&or=' + encodeURIComponent(`(${part('a')},${part('b')})`));
+  return api('?select=key,updated_at&or=' + encodeURIComponent(`(${part('a')},${part('b')},${part('m')})`));
 }
 const later = (x, y) => !y || Date.parse(x) > Date.parse(y);
 
@@ -226,7 +228,7 @@ async function doPull(all) {
     const want = [];
     for (const s of stamps || []) {
       const { slot } = parts(s.key);
-      if (slot !== 'a' && slot !== 'b') continue;
+      if (slot !== 'a' && slot !== 'b' && slot !== 'm') continue;   // m: the maker's feedback marks
       if (later(s.updated_at, next[slot])) next[slot] = s.updated_at;
       if (seen[s.key] !== s.updated_at || !lsHas(DOC(s.key))) want.push(s.key);
     }

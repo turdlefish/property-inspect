@@ -813,3 +813,6 @@ body{font-size:15px}
   main[data-route="prop"] .pmain > *{break-inside:avoid;margin-bottom:16px}
   main[data-route="prop"] .pmain > .pgroup{column-span:none}
 }
+
+/* A reply from the person who makes the app, under a feedback note (feedback.js). */
+.fb-reply{display:block;margin-top:4px;padding:6px 10px;border-radius:10px;background:var(--surface-2);font-size:13px;line-height:1.4;overflow-wrap:anywhere}

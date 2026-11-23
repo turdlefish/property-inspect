@@ -5,6 +5,9 @@
 // newest-wins merge works per note:
 //   fb:<id> = { text, at, author, edited?, done, doneT }   (null = deleted)
 // Only the person who wrote a note can change its words or delete it; either of you can tick it.
+// The person who makes the app can tick one off too, from their feedback inbox,
+// with an optional reply and the version it's in: a separate document only they
+// write, p:m:feedback = { notes: { <id>: { done, at, reply?, in? } } }. The newest change wins.
 
 import * as store from './store.js';
 import { nameOf } from './people.js';
@@ -22,15 +25,23 @@ let showDone = false;
 
 function notes() {
   const me = store.me();
+  const mk = (store.read(store.keyFor('m', DOC), null) || {}).notes || {};
   return Object.entries(store.merged(DOC))
     .filter(([k, r]) => k.startsWith('fb:') && r.v && r.v.text)
-    .map(([k, r]) => ({ id: k.slice(3), ...r.v, mine: r.v.author === me }));
+    .map(([k, r]) => {
+      const n = { id: k.slice(3), ...r.v, mine: r.v.author === me, raw: r.v, maker: mk[k.slice(3)] || null, byMaker: false };
+      if (n.maker && (n.maker.at || 0) > (n.doneT || 0)) { n.done = !!n.maker.done; n.doneT = n.maker.at; n.byMaker = !!n.maker.done; }
+      return n;
+    });
 }
 const put = (id, v) => store.setField(DOC, 'fb:' + id, v);
 
 function itemHTML(n) {
   const who = esc(nameOf(n.author));
-  const meta = n.done ? `${who} · done ${day(n.doneT || n.at)}` : `${who} · ${day(n.at)}${n.edited ? ' · edited' : ''}`;
+  const meta = n.done
+    ? (n.byMaker ? `${who} · <b>✓ sorted by the person who makes ${APP}${n.maker.in ? ` (in ${esc(n.maker.in)})` : ''}</b> · ${day(n.doneT)}` : `${who} · done ${day(n.doneT || n.at)}`)
+    : `${who} · ${day(n.at)}${n.edited ? ' · edited' : ''}`;
+  const reply = n.maker && n.maker.reply ? `<span class="fb-reply">💬 ${esc(n.maker.reply)}</span>` : '';
   if (editing === n.id && n.mine) {
     return `<li class="fb-item editing" data-fb="${esc(n.id)}">
       <textarea class="input fb-edit" rows="3" maxlength="${MAX}" aria-label="Edit note">${esc(drafts[n.id] ?? n.text)}</textarea>
@@ -38,7 +49,7 @@ function itemHTML(n) {
   }
   return `<li class="fb-item${n.done ? ' done' : ''}" data-fb="${esc(n.id)}">
     <button type="button" class="fb-tick" data-fb-act="${n.done ? 'reopen' : 'done'}" aria-pressed="${!!n.done}" aria-label="${n.done ? 'Done, tap to reopen' : 'Mark as done'}">${n.done ? '✓' : ''}</button>
-    <div class="fb-body"><p class="fb-text">${esc(n.text)}</p><span class="fb-meta">${meta}</span></div>
+    <div class="fb-body"><p class="fb-text">${esc(n.text)}</p><span class="fb-meta">${meta}</span>${reply}</div>
     ${n.mine && !n.done ? '<button type="button" class="edit" data-fb-act="edit" aria-label="Edit">✎</button>' : ''}
     ${n.mine ? '<button type="button" class="edit" data-fb-act="delete" aria-label="Delete">✕</button>' : ''}</li>`;
 }
@@ -50,7 +61,7 @@ export function feedbackHTML() {
   const done = all.filter(n => n.done).sort((a, b) => (b.doneT || 0) - (a.doneT || 0));
   return `<span class="tape" aria-hidden="true"></span>
     <div class="q">💭 App feedback</div>
-    <p class="small muted" style="margin:0">Bugs, ideas and wishes for ${APP}. Either of you can add them, and tick them off once they’re sorted.</p>
+    <p class="small muted" style="margin:0">Bugs, ideas and wishes for ${APP}. Either of you can add them, and tick them off once they’re sorted. The person who makes ${APP} sees them too, and ticks them off when they’re sorted.</p>
     <form class="fb-add"><textarea class="input" name="fb" rows="2" maxlength="${MAX}" placeholder="e.g. Photos take ages to upload at inspections" aria-label="New feedback">${esc(drafts.add)}</textarea><button class="btn sm primary">Add</button></form>
     ${open.length ? `<ul class="fb-list">${open.map(itemHTML).join('')}</ul>` : '<p class="small muted" style="margin:0">Nothing open, lovely ✨</p>'}
     ${open.length ? '<div class="row-btns"><button type="button" class="btn sm" data-fb-act="copy">📋 Copy open feedback</button></div>' : ''}
@@ -101,8 +112,7 @@ export function mountFeedback(section) {
     const act = b.dataset.fbAct;
     const id = b.closest('[data-fb]')?.dataset.fb;
     const n = id ? notes().find(x => x.id === id) : null;
-    const { mine, ...rec } = n || {};
-    delete rec.id;
+    const rec = n ? { ...n.raw } : {};   // the note as saved (without the maker's tick)
     if (act === 'done' || act === 'reopen') {
       if (!n) return;
       put(id, { ...rec, done: act === 'done', doneT: Date.now() });

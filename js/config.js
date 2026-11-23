@@ -19,7 +19,7 @@ let mockFlag = false;
 try { mockFlag = localStorage.getItem('prop:mock') === '1'; } catch (e) {}
 
 // This app's version (shown on Us; the Android app's versionName matches it).
-export const VERSION = '1.10';
+export const VERSION = '1.11';
 
 export const CONFIG = {
   supabaseUrl: 'https://njywijcqspkwebfqesjx.supabase.co',
