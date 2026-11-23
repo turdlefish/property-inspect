@@ -18,6 +18,9 @@ try {
 let mockFlag = false;
 try { mockFlag = localStorage.getItem('prop:mock') === '1'; } catch (e) {}
 
+// This app's version (shown on Us; the Android app's versionName matches it).
+export const VERSION = '1.10';
+
 export const CONFIG = {
   supabaseUrl: 'https://njywijcqspkwebfqesjx.supabase.co',
   supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qeXdpamNxc3Brd2ViZnFlc2p4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyNTAwODcsImV4cCI6MjA4OTgyNjA4N30.2dAP4tXOr1ukQy8Q3_GkMjKhOfnwSCMnTjp9ofd79ls',

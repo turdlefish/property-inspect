@@ -13,7 +13,8 @@ import { setProp } from './props.js';
 
 export const BUCKET = 'property-photos';
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const headers = extra => ({ apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, ...extra });
+// The storage only takes (and lists) a space's files when the request names that space (x-space).
+const headers = (extra, space = store.getSession().space) => ({ apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'x-space': space, ...extra });
 
 const base = (propId, photoId) => `${store.getSession().space}/${propId}/${photoId}`;
 export const fullUrl = (propId, photoId) => `${apiBase()}/storage/v1/object/public/${BUCKET}/${base(propId, photoId)}.jpg`;
@@ -134,6 +135,34 @@ export async function deletePhoto(propId, photoId) {
       body: JSON.stringify({ prefixes: [base(propId, photoId) + '.jpg', base(propId, photoId) + '_t.jpg'] }),
     });
   } catch (e) { /* the record is gone; a leftover file is harmless */ }
+}
+
+/**
+ * After a move to a new space code (spacemove.js): copies this space's photo
+ * files into the new code's folder. Ones already there are skipped; the old
+ * files stay until the old space is removed.
+ */
+export async function copyPhotos(from, to) {
+  const pub = (space, path) => `${apiBase()}/storage/v1/object/public/${BUCKET}/${space}/${path}`;
+  for (const doc of store.docsLike('prop-')) {
+    const pid = doc.slice(5);
+    for (const [k, r] of Object.entries(store.merged(doc))) {
+      if (!k.startsWith('photo:') || !r.v) continue;
+      for (const f of [k.slice(6) + '.jpg', k.slice(6) + '_t.jpg']) {
+        const path = `${pid}/${f}`;
+        const there = await fetch(pub(to, path), { method: 'HEAD' }).catch(() => null);
+        if (there && there.ok) continue;
+        const got = await fetch(pub(from, path));
+        if (!got.ok) continue;   // never uploaded, or already gone
+        const put = await fetch(`${apiBase()}/storage/v1/object/${BUCKET}/${to}/${path}`, {
+          method: 'POST',
+          headers: headers({ 'Content-Type': 'image/jpeg', 'x-upsert': 'true', 'cache-control': '31536000' }, to),
+          body: await got.blob(),
+        });
+        if (!put.ok) throw new Error('photo copy ' + put.status);
+      }
+    }
+  }
 }
 
 /** A property's photos, oldest listing photos first, then yours, then floorplans. */

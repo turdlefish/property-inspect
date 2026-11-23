@@ -1,14 +1,15 @@
 // App start-up, routing (#lists, #inspections, #money, #prop-<id>), top bar and the Us sheet.
 
 import * as store from './store.js';
-import { CONFIG } from './config.js';
+import { CONFIG, VERSION } from './config.js';
+import { initMove, isShortCode, startMove } from './spacemove.js';
 import { runOnboarding } from './onboarding.js';
 import { renderLists, storageSheet } from './lists.js';
 import { renderInspections } from './inspections.js';
 import { renderMoney } from './money.js';
 import { limitState, limitsSheet, refreshUsage } from './limits.js';
 import { fillSea } from './sea.js';
-import { storageUse, mb } from './photos.js';
+import { storageUse, mb, copyPhotos } from './photos.js';
 import { addExamples, allProperties } from './props.js';
 import { mountFeedback } from './feedback.js';
 import { inspectionsOf, onSchedule, iso } from './inspections.js';
@@ -88,6 +89,7 @@ function renderUs() {
       <div><span class="muted">You</span><b>${esc(me.name)}</b></div>
       <div><span class="muted">Partner</span><b>${them.here ? esc(them.name) : 'Not joined yet'}</b></div>
       <div><span class="muted">Space code</span><b class="num">${esc(s.space)}</b></div>
+      <div><span class="muted">Version</span><span>Property Inspect ${VERSION} · ${window.PropNative ? 'Android app' : 'website'}</span></div>
       <div><span class="muted">Photo storage</span><button class="edit" data-storage>${(() => { const u = storageUse(); return `${mb(u.bytes)} of 1 GB (${Math.round(u.share * 100)}%) ›`; })()}</button></div>
       <div><span class="muted">Free limits</span><button class="edit" data-limits>${(() => {
         const st = limitState();
@@ -98,7 +100,7 @@ function renderUs() {
     <div class="field"><label>Look on this phone</label>
       <div class="seg" role="radiogroup" aria-label="Look">${[['light', 'Light · jellyfish'], ['dark', 'Dark · starfish'], ['auto', 'Auto']].map(([k, t]) => `<button data-theme-pick="${k}" aria-pressed="${themeNow() === k}">${t}</button>`).join('')}</div>
       <span class="small muted">Auto follows your phone’s light or dark setting.</span></div>
-    <div class="row-btns"><button class="btn" data-act="copy">Copy space code</button><button class="btn" data-act="sync">Sync now</button></div>
+    <div class="row-btns"><button class="btn" data-act="copy">Copy space code</button><button class="btn" data-act="sync">Sync now</button>${isShortCode(s.space) ? '<button class="btn" data-act="longer">🔑 Make our code longer</button>' : ''}</div>
     ${CONFIG.mock ? `<div class="card" style="background:var(--surface-2)"><span class="eyebrow">Test server</span><p class="small muted">Only on the test server. Open <b>127.0.0.1</b> instead of localhost in a second tab to be your partner.</p><button class="btn sm" data-act="examples">Add example properties</button></div>` : ''}
     <button class="btn" data-act="signout" style="color:var(--red)">Sign out on this phone</button></section>
     <section class="card fb-card" id="fbCard"></section></div>`;
@@ -117,6 +119,7 @@ function renderUs() {
     if (t.hasAttribute('data-close')) return closeSheet();
     if (a === 'signout2') { await store.flush(); store.signOut(); location.reload(); return; }
     if (a === 'copy') toast((await copyText(s.space)) ? 'Code copied' : 'Select the code to copy it');
+    if (a === 'longer') startMove();
     if (a === 'sync') { await store.syncNow(); toast('Synced'); render(true); }
     if (a === 'examples') { addExamples(); toast('Added 5 example properties'); nav.go('lists'); }
     if (a === 'signout') {
@@ -165,6 +168,16 @@ function start() {
   const h = (location.hash || '').slice(1);
   if (ROUTES.includes(h) || h.startsWith('prop-')) route = h;
   render();
+  // A move to a longer space code: asks for the new code when another app made one (spacemove.js).
+  initMove({
+    ns: 'prop', app: 'Property Inspect', store, toast, copyText,
+    sheet: (title, body) => ({ el: openSheet(`<h3>${title}</h3>${body}`), close: closeSheet }),
+    busy: sheetOpen,
+    myName: () => { const p = person(store.me()); return p.here ? p.name : ''; },
+    after: () => render(true),
+    photos: copyPhotos,
+    cls: { input: 'input', code: 'code', actions: 'row-btns', primary: 'btn primary', ghost: 'btn', err: 'err' },
+  });
   store.startSync().then(() => {
     // A link to a property this phone hadn't downloaded yet: open it now that it's here.
     if (h.startsWith('prop-') && route === 'lists') route = h;

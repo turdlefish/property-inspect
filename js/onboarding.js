@@ -15,7 +15,7 @@ export function runOnboarding(done) {
       <span class="eyebrow">Property Inspect</span>
       <h1>Find our place, together</h1>
       <p class="muted">You both share the same lists, notes and inspections. Use the space code from Human Being so you're paired the same way.</p>
-      <form id="ob-join" class="lookup"><input class="input" id="ob-code" placeholder="Space code, e.g. sunny-otter-1234" autocomplete="off" autocapitalize="none"><button class="btn primary">Find</button></form>
+      <form id="ob-join" class="lookup"><input class="input" id="ob-code" placeholder="Space code, e.g. sunny-otter-misty-fern-482913" autocomplete="off" autocapitalize="none"><button class="btn primary">Find</button></form>
       <p class="err" id="ob-err" hidden></p>
       <button class="btn" data-ob="new">Start a new space instead</button></div>`,
     who: () => {

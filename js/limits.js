@@ -53,7 +53,7 @@ export async function refreshUsage() {
   if (!s) return;
   const key = `prop:${s.space}:usage:${sydney().slice(0, 7)}`;
   try {
-    const r = await fetch(`${apiBase()}/rest/v1/${CONFIG.table}?select=value&key=eq.${encodeURIComponent(key)}`, { headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey } });
+    const r = await fetch(`${apiBase()}/rest/v1/${CONFIG.table}?select=value&key=eq.${encodeURIComponent(key)}`, { headers: { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, 'x-space': s.space } });
     if (!r.ok) return;
     const rows = await r.json();
     const v = rows && rows[0] && rows[0].value ? JSON.parse(rows[0].value) : null;

@@ -15,6 +15,7 @@
 // your own edits back again.
 
 import { CONFIG, apiBase } from './config.js';
+import { makeLongCode } from './spacemove.js';
 
 const NS = 'prop';
 const HB_NS = 'tend';   // Human Being: only its profiles are read, for pairing
@@ -168,13 +169,16 @@ function setStatus(state) {
 }
 
 // ── Network ───────────────────────────────────────────────────────────────
-function headers(extra = {}) {
-  return { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, ...extra };
+// The database only shows (and takes) a space's rows when the request names
+// that space in its x-space header, so nobody can look through other couples'.
+function headers(extra = {}, space = session && session.space) {
+  return { apikey: CONFIG.supabaseKey, Authorization: 'Bearer ' + CONFIG.supabaseKey, ...(space ? { 'x-space': space } : {}), ...extra };
 }
-async function api(query, opts = {}) {
+// space: another space than yours (only when joining one).
+async function api(query, { space, ...opts } = {}) {
   stats.requests++;
   if (opts.body) stats.up += opts.body.length;
-  const r = await fetch(apiBase() + '/rest/v1/' + CONFIG.table + query, { ...opts, headers: headers(opts.headers) });
+  const r = await fetch(apiBase() + '/rest/v1/' + CONFIG.table + query, { ...opts, headers: headers(opts.headers, space) });
   const text = await r.text().catch(() => '');
   stats.down += text.length;
   if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + text);
@@ -184,10 +188,10 @@ async function api(query, opts = {}) {
 const inList = fks => 'in.(' + fks.map(k => '"' + k + '"').join(',') + ')';
 const quote = v => '"' + v + '"';
 
-async function fetchDocs(fks) {
+async function fetchDocs(fks, space) {
   const out = [];
   for (let i = 0; i < fks.length; i += 40) {
-    const rows = await api('?select=key,value,updated_at&key=' + encodeURIComponent(inList(fks.slice(i, i + 40)))) || [];
+    const rows = await api('?select=key,value,updated_at&key=' + encodeURIComponent(inList(fks.slice(i, i + 40))), { space }) || [];
     for (const row of rows) {
       let v = row.value;
       if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = null; } }
@@ -309,6 +313,37 @@ export function startSync() {
 export function stopSync() { clearInterval(pollTimer); pollTimer = null; }
 export const syncNow = () => flush().then(() => pull({ full: true }));
 
+/**
+ * Moves this phone to a new space code (see spacemove.js), keeping everything
+ * it has: each document, and any edits still waiting to be sent, only change
+ * their name (a copy is never dropped unless the new name holds one as new).
+ * Then syncs again with the new code.
+ */
+export function rekeySpace(to) {
+  const from = session.space;
+  if (!to || to === from) return Promise.resolve(true);
+  stopSync();
+  const swap = fk => { const m = /^([a-z]+):([^:]+):(.*)$/.exec(fk); return m && m[2] === from ? `${m[1]}:${to}:${m[3]}` : null; };
+  const keys = [];
+  try { for (let i = 0; i < localStorage.length; i++) keys.push(localStorage.key(i)); } catch (e) {}
+  for (const k of keys) {
+    if (!k || !k.startsWith(DOC_PREFIX)) continue;
+    const nk = swap(k.slice(DOC_PREFIX.length));
+    if (!nk) continue;
+    const e = lsGet(k), cur = lsGet(DOC(nk));
+    if (!e || (cur && (cur.t || 0) >= (e.t || 0)) || lsSet(DOC(nk), e)) lsDel(k);
+  }
+  dirty = new Set([...dirty].map(fk => swap(fk) || fk));
+  seen = {};
+  lsSet(DIRTY_KEY, [...dirty]);
+  lsSet(SEEN_KEY, seen);
+  cursor = {};
+  lastFull = 0;
+  lsSet(CURSOR_KEY, cursor);
+  setSession({ ...session, space: to });
+  return startSync();
+}
+
 document.addEventListener('visibilitychange', () => {
   if (!session) return;
   if (document.visibilityState === 'visible') { flush(); if (Date.now() - lastPull > 15000) pull(); }
@@ -319,18 +354,13 @@ window.addEventListener('offline', () => setStatus('offline'));
 
 // ── Spaces ────────────────────────────────────────────────────────────────
 export const normalizeCode = s => String(s || '').toLowerCase().trim().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-export function makeSpaceCode() {
-  const A = ['sunny', 'cozy', 'leafy', 'bright', 'breezy', 'quiet', 'golden', 'snug', 'lucky', 'gentle'];
-  const N = ['wattle', 'banksia', 'gum', 'fern', 'waratah', 'magpie', 'wren', 'koala', 'possum', 'robin'];
-  const r = new Uint32Array(3);
-  crypto.getRandomValues(r);
-  return `${A[r[0] % A.length]}-${N[r[1] % N.length]}-${1000 + (r[2] % 9000)}`;
-}
+// New spaces get a long code; older couples can move to one from Us (spacemove.js).
+export const makeSpaceCode = () => makeLongCode();
 
 // Who's already in a space? { a?, b? } from Property Inspect, hb: { a?, b? } from Human Being.
 export async function peekSpace(code) {
   const fks = ['a', 'b'].flatMap(s => [`${NS}:${code}:p:${s}:profile`, `${HB_NS}:${code}:p:${s}:profile`]);
-  const rows = await fetchDocs(fks);
+  const rows = await fetchDocs(fks, code);
   const out = { hb: {} };
   rows.forEach(r => {
     const [ns, , , slot] = r.key.split(':');
